@@ -67,13 +67,8 @@ classdef arduino < handle % use the class as a handle
                   };
   end % read-only property
   properties (Access=private)
-    connection_type; % 'serial' or 'tcp'
     connection; % the connection object, either 
-    DeviceAddress; % IP Address
-    Port; % serial or tcp port
-    Board;
-    AvailablePins;
-    
+   
     % holds the read and write functions
     ard_read;
     ard_write;
@@ -81,17 +76,22 @@ classdef arduino < handle % use the class as a handle
     analog_map; % a map of the analog pins to their digital counterparts
     digital_max; % the highest pin value
     pin_modes; % saves all pin modes
-    firmware;
-    FirmataVersion;
   end
-  properties (Access=private)
-    Voltage;
-    ANALOG_MAX = 1023; % maximum analog value
+  properties (Access=public) % public properties
+    connection_type;         % 'serial' or 'tcp'
+    Voltage;                 % board voltage
+    ANALOG_MAX = 1023;       % maximum analog value
+    DeviceAddress;           % IP Address
+    Port;                    % serial or tcp port
+    Board;                   % board name
+    AvailablePins;           % available pins
+    firmware;                % not used
+    FirmataVersion;          % firmata version
   end
   methods
-    function obj = arduino(address,Board,port)
+    function obj = arduino(address,Board)
       
-      if (nargin<1) || (length(address)==0) % if no port/address is specified or it's: ''
+      if (nargin<1) || (isempty(address)) % if no port/address is specified or it's: ''
         tmp = instrhwinfo('serial'); % find all serial devices
         if length(tmp) < 1
           disp('No port specified and no serial device found\n');
@@ -130,7 +130,12 @@ classdef arduino < handle % use the class as a handle
         obj.ard_write = @tcp_write;
       elseif strcmp(obj.connection_type,'serial');
         obj.connection = serial(obj.Port,'BaudRate',obj.BAUD,'Timeout',obj.SERIAL_TIMEOUT);
-        fopen(obj.connection);
+        try
+            fopen(obj.connection);
+        catch
+            delete(instrfindall);
+            error('');
+        end
         if obj.connection.BytesAvailable > 0
             fread(obj.connection, obj.connection.BytesAvailable);
         end
@@ -138,7 +143,8 @@ classdef arduino < handle % use the class as a handle
         obj.ard_write = @fwrite;
       else
         disp('invalid connection type\n');
-        error('Error');
+        error(['Error: Cannot connect to the COM3 port. Possible reasons are another ' ...
+              'application is connected to the port or the port does not exist.']);
       end
       pause(0.1);
       
@@ -164,7 +170,7 @@ classdef arduino < handle % use the class as a handle
         disp('Board misbehaving, is Firmata uploaded?\n');
         error('Error');
       end
-      [data,count]=obj.ard_read(obj.connection,2);
+      [data,~]=obj.ard_read(obj.connection,2);
       if data(1) < obj.MAJOR_VERSION
         fprintf('Firmata protocol needs to be %f or greater (current is %i.%i)\n',obj.VERSION, data(1), data(2));
         error('Error');
@@ -176,7 +182,7 @@ classdef arduino < handle % use the class as a handle
       
       
       % find the uploaded firmware name
-      [data,count] = obj.ard_read(obj.connection,80); % read the remaining string
+      [data,~] = obj.ard_read(obj.connection); % read the remaining string
       data = data(5:(end-1)); % remove the leading and trailing values
       
       % get the fluff out of the firmware string
@@ -188,7 +194,7 @@ classdef arduino < handle % use the class as a handle
           i = i + 1;
         end
       end
-      firmware = char(firmware); % turn to a char
+      %firmware = char(firmware); % turn to a char
       obj.firmware = firmware;
       
       % find the analog pin map and the maximum digital pin
@@ -243,13 +249,14 @@ classdef arduino < handle % use the class as a handle
     function delete(obj)
         % obj is always scalar
         fclose(obj.connection);
+        stopasync(obj.connection);
+        fprintf('Serial status: %s\n', obj.connection.Status);
         delete(obj.connection);
     end
     function mode = configurePin(obj,pin,mode)
       pin = obj.pinNumber(pin); % get the pin number
       if nargin > 2 % if the mode is read in
         if ~strcmp(obj.pin_modes{pin},mode) % if it's a new mode
-          m = 0;
           switch mode
             case 'AnalogInput'
               m = 2;
@@ -281,7 +288,7 @@ classdef arduino < handle % use the class as a handle
           end
           obj.pin_modes{pin} = mode;
           msg = [obj.SET_PIN_MODE,pin,m];
-          n = obj.ard_write(obj.connection,char(msg)); % write the actual message
+          obj.ard_write(obj.connection,char(msg)); % write the actual message
         end % only run if it was a new mode
       else % if the mode is not read in, return it
         % analog_mapping_query(obj);
@@ -304,14 +311,14 @@ classdef arduino < handle % use the class as a handle
       data = 0;
       tic;
       while data ~= bitor(obj.DIGITAL_MSG,port)
-        [data,count] = obj.ard_read(obj.connection,1); % read in the info, while trying to get rid of more
+        [data,~] = obj.ard_read(obj.connection,1); % read in the info, while trying to get rid of more
         if toc > obj.TIMEOUT
           disp('timed out');
           err = 1;
           return;
         end
       end
-      [data,count] = obj.ard_read(obj.connection,2);
+      [data,~] = obj.ard_read(obj.connection,2);
       port_map = bitor(data(1), bitshift(bitand(data(2),1),7)); % make a port map
       val = ~(0==bitand(port_map,bitshift(1,bit))); % return the value of that bit
     end
@@ -331,18 +338,18 @@ classdef arduino < handle % use the class as a handle
       if duty > 255
         duty = 255;
       end
-      [p,a] = obj.pinNumber(pin);
+      [p,~] = obj.pinNumber(pin);
       obj.configurePin(pin,'PWM');
       lsb = bitand(duty,hex2dec('7F'));
       msb = bitshift(duty,-7);
       msg = char([obj.START_SYSEX, obj.EXTENDED_ANALOG, p, lsb, msb, obj.END_SYSEX]);
-      n = obj.ard_write(obj.connection,msg);
+      obj.ard_write(obj.connection,msg);
     end
     function [volt,value,err] = readVoltage(obj,pin)
       volt = 0;
       value = 0;
       err = 0;
-      [p,a] = obj.pinNumber(pin); % get the pin number and the analog
+      [~,a] = obj.pinNumber(pin); % get the pin number and the analog
       if a<0 % if the pin isn't analog
         disp('readVoltage can only be used on analog pins (''A0'',''A6'')\n');
         error('Error');
@@ -357,14 +364,14 @@ classdef arduino < handle % use the class as a handle
       data = 0;
       tic;
       while data~=bitor(obj.ANALOG_MSG,a)
-        [data,count] = obj.ard_read(obj.connection,1);
+        [data,~] = obj.ard_read(obj.connection,1);
         if toc > obj.TIMEOUT
           disp('timed out');
           err = 1;
           return
         end
       end
-      [data,count] = obj.ard_read(obj.connection,2);
+      [data,~] = obj.ard_read(obj.connection,2);
       lsb = double(data(1));
       msb = bitshift(double(data(2)),7);
       value = bitor(lsb,msb);
@@ -379,14 +386,13 @@ classdef arduino < handle % use the class as a handle
         fprintf('                     Port: '''); fprintf(obj.Port);fprintf('''\n');
       end
       fprintf('                    Board: ''');fprintf(obj.Board);fprintf('\n');
-      fprintf('                 Firmware: ''');fprintf(obj.firmware);fprintf('''\n');
       fprintf('           FirmataVersion: ');fprintf(obj.FirmataVersion);fprintf('\n');
       fprintf('            AvailablePins: ');fprintf(obj.AvailablePins);fprintf('\n');
       fprintf('                  Voltage: ');fprintf(num2str(obj.Voltage));fprintf('V\n');
       fprintf('\n');
     end
   end
-  methods %(Access=private,Hidden=true)
+  methods(Access=private,Hidden=true)
     function [p,analog] = pinNumber(obj,pin)
       if ~ischar(pin)
         disp('pin must be a string (''D3'', ''A10'')\n');
@@ -413,7 +419,7 @@ classdef arduino < handle % use the class as a handle
       % get sysex response
       [cmd,msg] = obj.read_sysex();
       if cmd ~= obj.ANALOG_MAPPING_RESPONSE
-        disp(sprintf('problem with reading analog map, try again. %i\n',cmd));
+        fprintf('problem with reading analog map, try again. %i\n', cmd);
         error('Error');
       end
       % get max pin number
