@@ -1,24 +1,24 @@
-## Copyright (C) 2017 Blake Felt <blake.w.felt@gmail.com>
-## 
-## This program is free software: you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation, either version 3 of the License, or
-## (at your option) any later version.
-## 
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-## 
-## You should have received a copy of the GNU General Public License
-## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+% Copyright (C) 2017 Blake Felt <blake.w.felt@gmail.com>
+% 
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 % this is a private function, so there can be the fancy
 % help functions for each of the desired functions
 
 classdef arduino < handle % use the class as a handle
   properties (Access=private, Hidden=true) % unchanging properties
-    BAUD = 57600; % serial baud
+    BAUD = 115200; % serial baud
     SERIAL_TIMEOUT = 10; % timeout for the serial class, tenths of a second
     TCP_TIMEOUT = 100; % timeout for the tcp class, tenths of a second
     TIMEOUT = 8; % timeout for receiving data, such as after a reboot, seconds
@@ -55,15 +55,15 @@ classdef arduino < handle % use the class as a handle
     
     % pin mappings of various boards
     %                AvailablePins,     Board, Voltage
-    BOARD_MAPS = {"{'D0-D19', 'A0-A5'}","Uno",5;... % Arduino Uno
-                  "{'D0-D21', 'A0-A7'}","Nano",5;... % Arduino Nano
-                  "{'D0-D24', 'A0-A11'}","Teensy 2.0",5;... % Teensy 2.0
-                  "{'D0-D24', 'A0-A11'}","Teensy 2.0 3.3V",3.3;... % Teensy 2.0 w/ 3.3V regulator
-                  "{'D0-D21', 'A0-A6'}","MKR1000",3.3;... % Arduino MKR1000
-                  "{'D0-D17', 'A0'}","ESP8266",3.3;... % ESP8266, tested with NodeMCU
-                  "{}","Generic 5V",5;... % generic, a 5V board
-                  "{}","Generic 3.3V",3.3;... % generic, a 3.3V board
-                  "{}","Generic 1.8V",1.8;... % generic, a 1.8V board
+    BOARD_MAPS = {'{'D0-D19', 'A0-A5'}','Uno',5;... % Arduino Uno
+                  '{'D0-D21', 'A0-A7'}','Nano',5;... % Arduino Nano
+                  '{'D0-D24', 'A0-A11'}','Teensy 2.0',5;... % Teensy 2.0
+                  '{'D0-D24', 'A0-A11'}','Teensy 2.0 3.3V',3.3;... % Teensy 2.0 w/ 3.3V regulator
+                  '{'D0-D21', 'A0-A6'}','MKR1000',3.3;... % Arduino MKR1000
+                  '{'D0-D17', 'A0'}','ESP8266',3.3;... % ESP8266, tested with NodeMCU
+                  '{}','Generic 5V',5;... % generic, a 5V board
+                  '{}','Generic 3.3V',3.3;... % generic, a 3.3V board
+                  '{}','Generic 1.8V',1.8;... % generic, a 1.8V board
                   };
   endproperties % read-only property
   properties (SetAccess=private)
@@ -94,26 +94,26 @@ classdef arduino < handle % use the class as a handle
         pkg unload instrument-control; % helps suppress warnings
         pkg load instrument-control;
       catch
-        disp('Unable to load arduino functionality, is instrument-control installed?\n"pkg install -forge instrument-control"\n');
+        disp('Unable to load arduino functionality, is instrument-control installed?\n'pkg install -forge instrument-control'\n');
         error();
       end
       
       if (nargin<1) || (length(address)==0) % if no port/address is specified or it's: ''
-        tmp = instrhwinfo("serial"); % find all serial devices
+        tmp = instrhwinfo('serial'); % find all serial devices
         if length(tmp) < 1
-          disp("No port specified and no serial device found\n");
+          disp('No port specified and no serial device found\n');
           error();
         endif
         tmp = char(tmp(1)); % save the first device that appears
         if isunix() % if Unix based (Linux, Mac, etc.)
-          tmp = strcat("/dev/",tmp); % put the beginning on
+          tmp = strcat('/dev/',tmp); % put the beginning on
         endif
         obj.Port = tmp;
         address = tmp;
         obj.connection_type = 'serial';
       endif
       if ~ischar(address) % if the address is not a string
-        disp("port/address must be specified as a string!\n");
+        disp('port/address must be specified as a string!\n');
         error();
       endif
       
@@ -121,7 +121,7 @@ classdef arduino < handle % use the class as a handle
         [val,obj.DeviceAddress,tmp_port] = obj.ifIP(address); % check if the address is an IP
         if val
           obj.connection_type = 'tcp';
-          %obj.Port = sprintf("%i",tmp_port);
+          %obj.Port = sprintf('%i',tmp_port);
           obj.Port = tmp_port;
         else
           obj.connection_type = 'serial';
@@ -141,7 +141,7 @@ classdef arduino < handle % use the class as a handle
         obj.ard_read = @srl_read;
         obj.ard_write = @srl_write;
       else
-        disp("invalid connection type\n");
+        disp('invalid connection type\n');
         error();
       endif
       pause(0.1);
@@ -160,23 +160,23 @@ classdef arduino < handle % use the class as a handle
       while count==0
         [data,count]=obj.ard_read(obj.connection,1); % try to read
         if (time()-strt) > obj.TIMEOUT % if it took too long
-          disp("Could not connect to board, is Firmata uploaded?\n");
+          disp('Could not connect to board, is Firmata uploaded?\n');
           error();
         endif
       endwhile
       if data ~= obj.PROTOCOL_VERSION
-        disp("Board misbehaving, is Firmata uploaded?\n");
+        disp('Board misbehaving, is Firmata uploaded?\n');
         error();
       endif
       [data,count]=obj.ard_read(obj.connection,2);
       if data(1) < obj.MAJOR_VERSION
-        disp("Firmata protocol needs to be %f or greater\n",obj.VERSION);
+        disp('Firmata protocol needs to be %f or greater\n',obj.VERSION);
         error();
       elseif data(1) == obj.MAJOR_VERSION && data(2) < obj.MINOR_VERSION
-        disp("Firmata protocol needs to be %f or greater\n",obj.VERSION);
+        disp('Firmata protocol needs to be %f or greater\n',obj.VERSION);
         error();
       endif
-      obj.FirmataVersion = sprintf("%i.%i",data(1),data(2));
+      obj.FirmataVersion = sprintf('%i.%i',data(1),data(2));
       
       
       % find the uploaded firmware name
@@ -341,7 +341,7 @@ classdef arduino < handle % use the class as a handle
       err = 0;
       [p,a] = obj.pinNumber(pin); % get the pin number and the analog
       if a<0 % if the pin isn't analog
-        disp("readVoltage can only be used on analog pins ('A0','A6')\n");
+        disp('readVoltage can only be used on analog pins ('A0','A6')\n');
         error();
       endif
       obj._configurePin(pin,'AnalogInput');
@@ -368,29 +368,29 @@ classdef arduino < handle % use the class as a handle
       volt =  double(value*obj.Voltage) / double(obj.ANALOG_MAX);
     endfunction
     function display(obj)
-      printf("   arduino with properties:\n\n");
+      printf('   arduino with properties:\n\n');
       if strcmp(obj.connection_type,'tcp')
-        printf("            DeviceAddress: '");printf(obj.DeviceAddress);printf("'\n");
-        printf("                     Port: ");printf("%i",obj.Port);printf("\n");
+        printf('            DeviceAddress: '');printf(obj.DeviceAddress);printf(''\n');
+        printf('                     Port: ');printf('%i',obj.Port);printf('\n');
       else
-        printf("                     Port: '");printf(obj.Port);printf("'\n");
+        printf('                     Port: '');printf(obj.Port);printf(''\n');
       endif
-      printf("                    Board: '");printf(obj.Board);printf("'\n");
-      printf("                 Firmware: '");printf(obj.firmware);printf("'\n");
-      printf("           FirmataVersion: ");printf(obj.FirmataVersion);printf("\n");
-      printf("            AvailablePins: ");printf(obj.AvailablePins);printf("\n");
-      printf("                  Voltage: ");printf(num2str(obj.Voltage));printf("V\n");
-      printf("\n");
+      printf('                    Board: '');printf(obj.Board);printf(''\n');
+      printf('                 Firmware: '');printf(obj.firmware);printf(''\n');
+      printf('           FirmataVersion: ');printf(obj.FirmataVersion);printf('\n');
+      printf('            AvailablePins: ');printf(obj.AvailablePins);printf('\n');
+      printf('                  Voltage: ');printf(num2str(obj.Voltage));printf('V\n');
+      printf('\n');
     endfunction
   endmethods
   methods %(Access=private,Hidden=true)
     function [p,analog] = pinNumber(obj,pin)
       if ~ischar(pin)
-        disp("pin must be a string ('D3', 'A10')\n");
+        disp('pin must be a string ('D3', 'A10')\n');
         error();
       endif
       if (pin(1)~='D') && (pin(1)~='A')
-        disp("pin must be labeled as digital or analog ('D2', 'A5')\n");
+        disp('pin must be labeled as digital or analog ('D2', 'A5')\n');
         error();
       endif
       
@@ -410,14 +410,14 @@ classdef arduino < handle % use the class as a handle
       % get sysex response
       [cmd,msg] = obj.read_sysex();
       if cmd ~= obj.ANALOG_MAPPING_RESPONSE
-        disp(sprintf("problem with reading analog map, try again. %i\n",cmd));
+        disp(sprintf('problem with reading analog map, try again. %i\n',cmd));
         error();
       endif
       % get max pin number
       obj.digital_max = length(msg)-1; % the highest pin available
       
       % start saving the available pins in a string
-      obj.AvailablePins = sprintf("{'D0-D%i'",obj.digital_max);
+      obj.AvailablePins = sprintf('{'D0-D%i'',obj.digital_max);
       
       % parse analog map
       obj.analog_map = struct();
@@ -426,7 +426,7 @@ classdef arduino < handle % use the class as a handle
       analog_prev = -1;
       for i = 1:obj.digital_max+1
         if msg(i) ~= 127 % 127 means the pin doesn't support analog
-          obj.analog_map.(sprintf("A%i",msg(i))) = i-1; % save the analog to digital conversion
+          obj.analog_map.(sprintf('A%i',msg(i))) = i-1; % save the analog to digital conversion
           analog_pins = [analog_pins (msg(i))];
         endif
       endfor
@@ -437,24 +437,24 @@ classdef arduino < handle % use the class as a handle
         seq = diff(analog_pins); % find the difference between them all
         analog_min = analog_pins(1);
         analog_prev = analog_pins(1);
-        obj.AvailablePins = [obj.AvailablePins, sprintf(", 'A%i",analog_pins(1))];
+        obj.AvailablePins = [obj.AvailablePins, sprintf(', 'A%i',analog_pins(1))];
         if length(seq) > 0 % more than one analog pin
           for i = 1:length(seq) % for every difference
             if seq(i) > 1 % if the jump was greater than 1
               if analog_prev ~= analog_min % if the last pin wasn't already written
-                obj.AvailablePins = [obj.AvailablePins, sprintf("-A%i",analog_prev)]; % write it up
+                obj.AvailablePins = [obj.AvailablePins, sprintf('-A%i',analog_prev)]; % write it up
                 analog_min = analog_prev; % save the last pin
               endif
-              obj.AvailablePins = [obj.AvailablePins, sprintf("', 'A%i",analog_pins(i))];
+              obj.AvailablePins = [obj.AvailablePins, sprintf('', 'A%i',analog_pins(i))];
             endif
             analog_prev = analog_pins(i);
           endfor
           % after looping, add the last pin
-          obj.AvailablePins = [obj.AvailablePins, sprintf("-A%i",analog_pins(end))];
+          obj.AvailablePins = [obj.AvailablePins, sprintf('-A%i',analog_pins(end))];
         endif
-        obj.AvailablePins = [obj.AvailablePins, "'"];
+        obj.AvailablePins = [obj.AvailablePins, '''];
       endif
-      obj.AvailablePins = [obj.AvailablePins, "}"];
+      obj.AvailablePins = [obj.AvailablePins, '}'];
     endfunction
     function [cmd,msg] = read_sysex(obj,max_size=100)
       % a backend function to read a sysex message
@@ -465,7 +465,7 @@ classdef arduino < handle % use the class as a handle
       while data ~= obj.START_SYSEX
         [data,count] = obj.ard_read(obj.connection,1);
         if (time()-strt) > obj.TIMEOUT
-          disp("reading sysex timed out\n");
+          disp('reading sysex timed out\n');
           error();
         endif
       endwhile
